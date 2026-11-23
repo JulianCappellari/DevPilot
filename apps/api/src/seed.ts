@@ -24,7 +24,7 @@ export async function createDemoRepo(parent: string): Promise<string> {
   mkdirSync(repo, { recursive: true });
   writeFileSync(path.join(repo, "package.json"), JSON.stringify({
     name: "demo-app", version: "1.0.0", private: true,
-    scripts: { lint: "node scripts/check.js lint", test: "node scripts/check.js test", typecheck: "node scripts/check.js typecheck" },
+    scripts: { lint: "node scripts/check.js lint", test: "node scripts/check.js test", typecheck: "node scripts/check.js typecheck", build: "node scripts/check.js build" },
   }, null, 2));
   mkdirSync(path.join(repo, "scripts"), { recursive: true });
   writeFileSync(path.join(repo, "scripts", "check.js"), "console.log('check', process.argv[2], 'ok');\n");

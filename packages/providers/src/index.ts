@@ -1,7 +1,11 @@
 import type { CostOrigin } from "@devpilot/domain";
-import { OllamaProvider } from "./ollama.js";
+import { OllamaProvider, safeTargetPath } from "./ollama.js";
+import { CodexProvider, type CodexMode } from "./codex.js";
+import { MarkdownProvider, type MarkdownEdit } from "./markdown.js";
 
 export * from "./ollama.js";
+export * from "./codex.js";
+export * from "./markdown.js";
 
 /** Contrato de proveedor (spec §8.4). El dominio no depende de formatos propietarios de SDK. */
 export type Capabilities = { id: string; costOrigin: CostOrigin; canWriteCode: boolean };
@@ -12,6 +16,7 @@ export type AgentRequest = {
   runId: string; projectId: string; worktreePath: string;
   task: string; acceptanceCriteria: string[];
   policy: ExecutionPolicy; contextRefs: string[];
+  markdownEdit?: MarkdownEdit;
 };
 
 export type AgentEvent =
@@ -47,12 +52,10 @@ export class DemoWriterProvider implements AgentProvider {
     yield { type: "started", runId: request.runId };
     if (signal.aborted) { yield { type: "error", message: "aborted" }; return; }
     yield { type: "progress", message: "Analizando la tarea" };
-    const { mkdir, writeFile } = await import("node:fs/promises");
-    const path = await import("node:path");
+    const { writeFile } = await import("node:fs/promises");
     const rel = "devpilot-notes/" + request.runId + ".md";
-    await mkdir(path.join(request.worktreePath, "devpilot-notes"), { recursive: true });
     const body = ["# Notas de la ejecución", "", "Tarea: " + request.task, "", "## Criterios de aceptación", ...request.acceptanceCriteria.map((c) => "- " + c), ""].join("\n");
-    await writeFile(path.join(request.worktreePath, rel), body, "utf8");
+    await writeFile(await safeTargetPath(request.worktreePath, rel), body, { encoding: "utf8", flag: "wx" });
     yield { type: "file_changed", path: rel, change: "added" };
     yield { type: "progress", message: "Cambios escritos" };
     yield { type: "completed" };
@@ -105,12 +108,13 @@ export class UnavailableProvider implements AgentProvider {
   }
 }
 
-export function defaultProviders(ollama: { baseUrl: string; model: string } = { baseUrl: "http://127.0.0.1:11434", model: "gemma4:12b" }): Map<string, AgentProvider> {
+export function defaultProviders(ollama: { baseUrl: string; model: string } = { baseUrl: "http://127.0.0.1:11434", model: "gemma4:12b" }, codexMode: CodexMode = "off"): Map<string, AgentProvider> {
   const list: AgentProvider[] = [
     new OllamaProvider(ollama),
     new MockProvider(),
     new DemoWriterProvider(),
-    new UnavailableProvider("codex", "SUBSCRIPTION_QUOTA", "Pendiente de validar la interfaz oficial de Codex (spec §22.1); usar mock-writer o ejecución manual"),
+    new MarkdownProvider(),
+    new CodexProvider(codexMode),
   ];
   return new Map(list.map((p) => [p.id, p]));
 }

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { isSensitivePath, redactSecrets, resolveInsideRoot } from "@devpilot/security";
@@ -61,11 +61,15 @@ export async function safeTargetPath(worktree: string, rel: string): Promise<str
   await resolveInsideRoot(worktree, ancestor).catch(() => { throw new UnsafePathError("fuera del worktree"); });
   await mkdir(parent, { recursive: true });
   await resolveInsideRoot(worktree, parent).catch(() => { throw new UnsafePathError("fuera del worktree"); });
-  if (existsSync(target)) await resolveInsideRoot(worktree, target).catch(() => { throw new UnsafePathError("el destino es un enlace fuera del worktree"); });
+  const targetStat = await lstat(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw error;
+    return undefined;
+  });
+  if (targetStat && !targetStat.isFile()) throw new UnsafePathError("el destino no es un archivo regular");
   return target;
 }
 
-function collectContext(worktree: string, budget = 24_000): Array<{ path: string; content: string }> {
+function collectContext(worktree: string, refs: readonly string[], budget = 24_000): Array<{ path: string; content: string }> {
   const found: Array<{ path: string; size: number }> = [];
   const walk = (dir: string, depth: number) => {
     if (depth > 3) return;
@@ -80,7 +84,7 @@ function collectContext(worktree: string, budget = 24_000): Array<{ path: string
     }
   };
   walk(worktree, 0);
-  const rank = (p: string) => (/^readme/i.test(p) ? 0 : p === "package.json" ? 1 : p.includes("/") ? 3 : 2);
+  const rank = (p: string) => (refs.includes(p) ? -1 : /^readme/i.test(p) ? 0 : p === "package.json" ? 1 : p.includes("/") ? 3 : 2);
   found.sort((a, b) => rank(a.path) - rank(b.path) || a.size - b.size);
   const out: Array<{ path: string; content: string }> = [];
   let used = 0;
@@ -116,7 +120,10 @@ export class OllamaProvider implements AgentProvider {
 
   async health(): Promise<Health> {
     try {
-      const r = await this.f(new URL("/api/tags", this.opts.baseUrl), { signal: AbortSignal.timeout(2500) });
+      const url = new URL("/api/tags", this.opts.baseUrl);
+      if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname))
+        return { available: false, detail: "ollama-local requiere una dirección de loopback" };
+      const r = await this.f(url, { signal: AbortSignal.timeout(2500), redirect: "error" });
       if (!r.ok) return { available: false, detail: `Ollama respondió HTTP ${r.status}` };
       const names = ((await r.json()) as { models?: Array<{ name?: string }> }).models?.map((m) => m.name) ?? [];
       return names.includes(this.opts.model)
@@ -130,12 +137,17 @@ export class OllamaProvider implements AgentProvider {
   async *execute(req: AgentRequest, signal: AbortSignal): AsyncIterable<AgentEvent> {
     yield { type: "started", runId: req.runId };
     yield { type: "progress", message: `Leyendo contexto del repositorio` };
-    const ctx = collectContext(req.worktreePath);
+    const url = new URL("/api/generate", this.opts.baseUrl);
+    if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {
+      yield { type: "error", message: "ollama-local requiere una dirección de loopback" };
+      return;
+    }
+    const ctx = collectContext(req.worktreePath, req.contextRefs);
     yield { type: "progress", message: `Consultando a ${this.opts.model} (${ctx.length} archivo(s) de contexto)` };
     let proposal: Proposal;
     try {
-      const res = await this.f(new URL("/api/generate", this.opts.baseUrl), {
-        method: "POST", headers: { "content-type": "application/json" },
+      const res = await this.f(url, {
+        method: "POST", headers: { "content-type": "application/json" }, redirect: "error",
         signal: AbortSignal.any([signal, AbortSignal.timeout(req.policy.timeoutMs)]),
         body: JSON.stringify({ model: this.opts.model, prompt: buildPrompt(req, ctx), stream: false, think: false, format: JSON_SCHEMA, options: { temperature: 0.1, num_ctx: 12288, num_predict: 6000 } }),
       });

@@ -10,10 +10,13 @@ import { startWorker, reconcileOrphans } from "../../worker/src/worker.js";
 import { buildApp } from "../src/app.js";
 import { hashPassword } from "../src/auth.js";
 import { createDemoRepo, seedRoots } from "../src/seed.js";
+import { AppError } from "../src/errors.js";
 
 const PW = "correct-horse-battery";
 let base: string, config: Config, db: DB, app: FastifyInstance, providers: Map<string, AgentProvider>;
 let repo: string, cookie = "", csrf = "";
+let publishAllowed = false;
+let publishCalls = 0;
 
 type Res = { status: number; body: any };
 async function call(method: string, url: string, body?: unknown, opts: { auth?: boolean; csrf?: boolean; origin?: string } = {}): Promise<Res> {
@@ -39,7 +42,7 @@ class SlowProvider implements AgentProvider {
 async function newRun(providerId: string, title = "Corregir redirección post-login"): Promise<{ taskId: string; runId: string }> {
   const t = await call("POST", "/tasks", { projectId: projectId, title, type: "bug", priority: "medium", acceptanceCriteria: ["Usuario autenticado navega a /dashboard"] });
   expect(t.status).toBe(200);
-  const r = await call("POST", `/tasks/${t.body.data.id}/runs`, { providerId });
+  const r = await call("POST", `/tasks/${t.body.data.id}/runs`, { providerId, ...(providerId === "codex" ? { acknowledgeExternal: true } : {}) });
   expect(r.status).toBe(200);
   return { taskId: t.body.data.id, runId: r.body.data.id };
 }
@@ -58,7 +61,19 @@ beforeAll(async () => {
   run(db, "INSERT INTO user(id,username,password_hash,created_at) VALUES(?,?,?,?)", newId("usr"), "owner", hashPassword(PW), nowIso());
   repo = await createDemoRepo(path.join(base, "projects"));
   seedRoots(db, { ...config, projectRoots: [path.join(base, "projects")] });
-  app = buildApp({ db, config, providers });
+  app = buildApp({ db, config, providers, prPublisher: {
+    async destination() { return { slug: "owner/fixture", url: "https://github.com/owner/fixture.git" }; },
+    async publish() {
+      publishCalls++;
+      if (!publishAllowed) throw new AppError("FORBIDDEN", "El repositorio no autorizó la publicación");
+      return { number: 1, url: "https://github.com/owner/fixture/pull/1" };
+    },
+  }, async githubReader(_cwd, slug, kind, page, state) {
+    expect(slug).toBe("owner/fixture");
+    expect(state).toBe("all");
+    return { items: [{ number: 12, title: `${kind} ${page}`, state: "open", updatedAt: "2026-11-23T01:01:00Z",
+      url: `https://github.com/${slug}/${kind === "pulls" ? "pull" : "issues"}/12`, draft: false }], hasMore: false };
+  } });
   await app.ready();
   const login = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "owner", password: PW } });
   expect(login.statusCode).toBe(200);
@@ -144,7 +159,7 @@ describe("flujo completo de punta a punta", () => {
     const aud = get<{ detail: string }>(db, "SELECT detail FROM audit_event WHERE action='review.approve' AND entity_id=?", runId)!;
     expect(JSON.parse(aud.detail).qaOverride).toBe(true);
     await w.stop();
-  });
+  }, 15_000);
 
   it("rechazar conserva la evidencia (RN-009) y needs_changes permite un nuevo intento (RN-012)", async () => {
     const w = startWorker({ db, config, providers }, 60_000);
@@ -201,9 +216,11 @@ describe("cancelación, timeout y recuperación", () => {
     expect(reconcileOrphans({ db, config, providers })).toBe(1);
     expect(get<{ state: string }>(db, "SELECT state FROM run WHERE id=?", runId)!.state).toBe("UNKNOWN");
     expect(get<{ state: string }>(db, "SELECT state FROM task WHERE id=?", taskId)!.state).toBe("UNKNOWN");
+    const stream = await app.inject({ method: "GET", url: `/api/v1/runs/${runId}/events`, headers: { cookie } });
+    expect(stream.body).toContain('event: run.end\ndata: {"state":"UNKNOWN"}');
   });
 
-  it("un proveedor sin integrar (codex) queda BLOCKED, nunca simula éxito", async () => {
+  it("Codex deshabilitado queda BLOCKED, nunca simula éxito", async () => {
     const w = startWorker({ db, config, providers }, 60_000);
     const { runId } = await newRun("codex", "Usar codex");
     await startAndRun(runId, w);
@@ -219,6 +236,17 @@ describe("seguridad de la API", () => {
     expect((await call("GET", "/projects", undefined, { auth: false })).status).toBe(401);
     expect((await call("POST", "/tasks", { projectId }, { csrf: false })).status).toBe(403);
     expect((await call("POST", "/roots", { path: base }, { origin: "http://evil.example" })).status).toBe(403);
+  });
+  it("acepta sólo el origen HTTPS configurado detrás del proxy y exige consentimiento de Codex", async () => {
+    config.allowedOrigins.push("https://pc.tailnet.ts.net");
+    try {
+      const credentials = { username: "owner", password: PW };
+      expect((await call("POST", "/auth/login", credentials, { auth: false, origin: "https://pc.tailnet.ts.net" })).status).toBe(200);
+      expect((await call("POST", "/auth/login", credentials, { auth: false, origin: "http://pc.tailnet.ts.net" })).status).toBe(403);
+      expect((await call("POST", "/auth/login", credentials, { auth: false, origin: "null" })).status).toBe(403);
+    } finally { config.allowedOrigins.pop(); }
+    const t = await call("POST", "/tasks", { projectId, title: "Consentimiento", type: "docs", priority: "low", acceptanceCriteria: ["Requiere permiso"] });
+    expect((await call("POST", `/tasks/${t.body.data.id}/runs`, { providerId: "codex" })).status).toBe(403);
   });
   it("T-002: registrar un repo fuera del root -> 403 y auditoría", async () => {
     const outside = path.join(base, "outside");
@@ -278,6 +306,64 @@ describe("seguridad de la API", () => {
   });
 });
 
+describe("contexto Markdown y publicación", () => {
+  it("detecta cambios externos y entrega el Markdown revisado en su rama", async () => {
+    const folder = `/projects/${projectId}/context`;
+    const original = (await call("POST", folder, { path: "README.md" })).body.data;
+    expect(original.path).toBe("README.md");
+    expect((await call("POST", folder, { path: "../README.md" })).status).toBe(400);
+    const file = path.join(repo, "README.md");
+    const before = await import("node:fs/promises").then((fs) => fs.readFile(file, "utf8"));
+    appendFileSync(file, "\nCambio externo\n");
+    const preview = await call("GET", folder + "/" + original.id);
+    expect(preview.body.data.changed).toBe(true);
+    const proposal = folder + "/" + original.id + "/proposals";
+    expect((await call("POST", proposal, { version: original.version, content: "# Propuesta\n" })).status).toBe(409);
+    writeFileSync(file, before);
+    const proposed = await call("POST", proposal, { version: original.version, content: "# Propuesta revisada\n" });
+    expect(proposed.status).toBe(200);
+    const t = `/tasks/${proposed.body.data.taskId}`;
+    expect((await call("POST", t + "/runs", { providerId: "mock-writer" })).status).toBe(422);
+    const created = await call("POST", t + "/runs", { providerId: "context-markdown" });
+    const runId = created.body.data.id;
+    const worker = startWorker({ db, config, providers }, 60_000);
+    try { await startAndRun(runId, worker); } finally { await worker.stop(); }
+    expect((await call("GET", `/runs/${runId}`)).body.data).toMatchObject({ state: "SUCCEEDED", error: null });
+    const diff = (await call("GET", `/runs/${runId}/diff`)).body.data;
+    expect(diff.files).toEqual([{ path: "README.md", status: "modified" }]);
+    expect(diff.patch).toContain("Propuesta revisada");
+    const approval = await call("POST", `/runs/${runId}/review`, { decision: "approve", diffHash: diff.diffHash, overrideQa: true, reason: "El fixture anterior deja un check fallido" });
+    expect(approval.status).toBe(200);
+    expect(await import("node:fs/promises").then((fs) => fs.readFile(file, "utf8"))).toBe(before);
+  });
+
+  it("requiere aprobación específica de PR, consume el permiso y conserva la entrega ante un 403 remoto", async () => {
+    const worker = startWorker({ db, config, providers }, 60_000);
+    const { runId } = await newRun("mock-writer", "Publicación de prueba");
+    try { await startAndRun(runId, worker); } finally { await worker.stop(); }
+    const url = `/runs/${runId}`;
+    const diff = (await call("GET", url + "/diff")).body.data;
+    const reviewed = await call("POST", url + "/review", { decision: "approve", diffHash: diff.diffHash, overrideQa: true, reason: "El fixture anterior deja un check fallido" });
+    expect(reviewed.status).toBe(200);
+    config.githubPrEnabled = true;
+    try {
+      expect((await call("POST", url + "/pr", { approvalId: "fabricado" })).status).toBe(403);
+      const target = (await call("GET", url + "/pr-target")).body.data;
+      expect((await call("POST", url + "/pr-approval", { ...target, repository: "otro/destino" })).status).toBe(409);
+      const first = (await call("POST", url + "/pr-approval", target)).body.data;
+      expect((await call("POST", url + "/pr", { approvalId: first.approvalId })).status).toBe(403);
+      publishAllowed = true;
+      expect((await call("POST", url + "/pr", { approvalId: first.approvalId })).status).toBe(403);
+      const second = (await call("POST", url + "/pr-approval", target)).body.data;
+      expect((await call("POST", url + "/pr", { approvalId: second.approvalId })).status).toBe(200);
+      expect((await call("GET", url)).body.data).toMatchObject({
+        deliveredCommit: reviewed.body.data.commit, state: "SUCCEEDED", pullRequest: { number: 1 },
+      });
+      expect(publishCalls).toBe(2);
+    } finally { config.githubPrEnabled = false; publishAllowed = false; }
+  });
+});
+
 describe("gestión de tareas (RF-006/007)", () => {
   const mk = async (title: string, priority = "low") => (await call("POST", "/tasks", { projectId, title, type: "chore", priority })).body.data;
   const list = async (qs: string) => (await call("GET", `/projects/${projectId}/tasks?${qs}`)).body.data as Array<{ title: string }>;
@@ -318,5 +404,64 @@ describe("gestión de tareas (RF-006/007)", () => {
   it("el proveedor ollama-local figura en /providers, con salud real (aquí: Ollama inaccesible)", async () => {
     const p = (await call("GET", "/providers")).body.data.providers.find((x: any) => x.id === "ollama-local");
     expect(p).toMatchObject({ costOrigin: "LOCAL", canWriteCode: true });
+  });
+});
+
+describe("trazabilidad de DP-SPEC-001", () => {
+  it("etiquetas, dependencias sin ciclos y liberación sólo tras aprobar el prerrequisito", async () => {
+    const required = await newRun("mock-writer", "Prerrequisito de secuencia");
+    const following = (await call("POST", "/tasks", { projectId, title: "Siguiente en secuencia", type: "docs",
+      priority: "medium", acceptanceCriteria: ["Hay notas"], labels: ["Secuencia", "secuencia"] })).body.data;
+    expect(following.labels).toEqual(["secuencia"]);
+    expect((await call("PATCH", `/tasks/${following.id}`, { version: following.version, prerequisiteIds: [required.taskId] })).status).toBe(200);
+    expect((await call("PATCH", `/tasks/${required.taskId}`, { version: 1, prerequisiteIds: [following.id] })).status).toBe(422);
+    expect((await call("POST", `/tasks/${required.taskId}/archive`)).status).toBe(422);
+    expect((await call("GET", `/projects/${projectId}/tasks?label=secuencia`)).body.data.map((task: { id: string }) => task.id)).toEqual([following.id]);
+    expect((await call("POST", `/tasks/${following.id}/runs`, { providerId: "mock" })).status).toBe(422);
+    const worker = startWorker({ db, config, providers }, 60_000);
+    try { await startAndRun(required.runId, worker); } finally { await worker.stop(); }
+    const evidence = (await call("GET", `/runs/${required.runId}/diff`)).body.data;
+    expect((await call("POST", `/runs/${required.runId}/review`, { decision: "approve", diffHash: evidence.diffHash,
+      overrideQa: true, reason: "El check del fixture falla intencionalmente" })).status).toBe(200);
+    expect((await call("POST", `/tasks/${following.id}/runs`, { providerId: "mock" })).status).toBe(200);
+  });
+
+  it("el inicio exige una solicitud nueva si la tarea cambió después de prepararla", async () => {
+    const pending = await newRun("mock");
+    expect((await call("PATCH", `/tasks/${pending.taskId}`, { version: 1, title: "Cambió el alcance original" })).status).toBe(200);
+    expect((await call("POST", `/runs/${pending.runId}/approve-start`)).status).toBe(409);
+    expect(get(db, "SELECT id FROM job WHERE run_id=?", pending.runId)).toBeUndefined();
+    expect((await call("POST", `/runs/${pending.runId}/cancel`)).status).toBe(200);
+  });
+
+  it("consulta issues y PR sólo con el flag de lectura y el origin del proyecto", async () => {
+    const route = `/projects/${projectId}/github`;
+    expect((await call("GET", route)).status).toBe(403);
+    config.githubReadEnabled = true;
+    try {
+      expect((await call("GET", route + "?kind=issues&page=1&state=all")).body.data.items[0].title).toBe("issues 1");
+      expect((await call("GET", route + "?kind=pulls&page=2&state=all")).body.data.items[0].title).toBe("pulls 2");
+      expect((await call("GET", route + "?repo=usuario/otro")).status).toBe(400);
+    } finally { config.githubReadEnabled = false; }
+  });
+
+  it("ata la revisión manual al diff y exporta sólo medidas agregadas", async () => {
+    const worker = startWorker({ db, config, providers }, 60_000);
+    const { runId } = await newRun("mock-writer", "Texto exclusivo confidencial de fixture");
+    try { await startAndRun(runId, worker); } finally { await worker.stop(); }
+    const api = `/runs/${runId}`;
+    const result = await call("GET", api);
+    expect(result.body.data.checks[0].environment).toMatch(/^Host/);
+    const brief = await call("POST", api + "/manual-review/brief", { acknowledgeExternal: true });
+    expect(brief.body.data.text).toContain("Evidencia QA");
+    expect((await call("POST", api + "/manual-review", { diffHash: "0".repeat(64), findings: "Versión vieja" })).status).toBe(409);
+    expect((await call("POST", api + "/manual-review", { diffHash: brief.body.data.diffHash, findings: "Revisar texto. password=ficticio-sensible" })).body.data.findings).toContain("[REDACTED]");
+    expect((await call("GET", api + "/manual-review")).body.data).toHaveLength(1);
+    expect((await call("POST", api + "/summary")).body.data.source).toBe("evidence");
+    const report = await call("POST", "/reports/portfolio");
+    expect(report.body.data.markdown).toContain("Informe técnico de DevPilot");
+    expect(report.body.data.markdown).not.toContain("Texto exclusivo confidencial");
+    expect(report.body.data.markdown).not.toContain(runId);
+    expect(report.body.data.markdown).not.toContain(repo);
   });
 });

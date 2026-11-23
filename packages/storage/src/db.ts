@@ -23,6 +23,11 @@ CREATE TABLE IF NOT EXISTS task(
   type TEXT NOT NULL, priority TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'DRAFT', version INTEGER NOT NULL DEFAULT 1,
   classification TEXT, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS task_project ON task(project_id, state);
+CREATE TABLE IF NOT EXISTS task_label(
+  task_id TEXT NOT NULL REFERENCES task(id), label TEXT NOT NULL, PRIMARY KEY(task_id,label));
+CREATE TABLE IF NOT EXISTS task_dependency(
+  task_id TEXT NOT NULL REFERENCES task(id), prerequisite_id TEXT NOT NULL REFERENCES task(id),
+  PRIMARY KEY(task_id,prerequisite_id), CHECK(task_id<>prerequisite_id));
 CREATE TABLE IF NOT EXISTS acceptance_criterion(
   id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES task(id), text TEXT NOT NULL, position INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS task_history(
@@ -31,7 +36,7 @@ CREATE TABLE IF NOT EXISTS task_history(
 CREATE TABLE IF NOT EXISTS run(
   id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES task(id), provider_id TEXT NOT NULL, state TEXT NOT NULL,
   attempt INTEGER NOT NULL, worktree_path TEXT, branch TEXT, base_commit TEXT, diff_hash TEXT, delivered_commit TEXT,
-  version INTEGER NOT NULL DEFAULT 1, error TEXT, cancel_requested INTEGER NOT NULL DEFAULT 0,
+  version INTEGER NOT NULL DEFAULT 1, error TEXT, cancel_requested INTEGER NOT NULL DEFAULT 0, external_ack INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL, started_at TEXT, finished_at TEXT, UNIQUE(task_id, attempt));
 CREATE INDEX IF NOT EXISTS run_task_state ON run(task_id, state);
 CREATE TABLE IF NOT EXISTS job(
@@ -51,6 +56,20 @@ CREATE TABLE IF NOT EXISTS approval(
 CREATE TABLE IF NOT EXISTS audit_event(
   id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT, action TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT,
   outcome TEXT NOT NULL, detail TEXT, correlation_id TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS pull_request(
+  run_id TEXT PRIMARY KEY REFERENCES run(id), commit_sha TEXT NOT NULL,
+  url TEXT NOT NULL, number INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS context_file(
+  id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES project(id), path TEXT NOT NULL,
+  sha256 TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(project_id, path));
+CREATE TABLE IF NOT EXISTS context_proposal(
+  task_id TEXT PRIMARY KEY REFERENCES task(id), file_id TEXT NOT NULL REFERENCES context_file(id),
+  path TEXT NOT NULL, base_sha256 TEXT NOT NULL, content TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS manual_review(
+  id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES run(id), diff_hash TEXT NOT NULL,
+  actor_id TEXT NOT NULL REFERENCES user(id), findings TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS manual_review_run ON manual_review(run_id,created_at);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_event BEGIN SELECT RAISE(ABORT, 'audit_event es append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_event BEGIN SELECT RAISE(ABORT, 'audit_event es append-only'); END;
 CREATE TRIGGER IF NOT EXISTS run_event_no_update BEFORE UPDATE ON run_event BEGIN SELECT RAISE(ABORT, 'run_event es append-only'); END;
@@ -61,6 +80,22 @@ export function openDb(file: string): DB {
   const db = new DatabaseSync(file);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL;");
   db.exec(SCHEMA);
+  tx(db, () => {
+    const columns = new Map([
+      ["run", [
+        ["external_ack", "INTEGER NOT NULL DEFAULT 0"],
+        ["requested_task_version", "INTEGER"],
+        ["requested_project_version", "INTEGER"],
+        ["write_scope", "INTEGER"],
+        ["cost_origin", "TEXT"],
+      ]],
+      ["quality_check", [["environment", "TEXT"]]],
+    ] as const);
+    for (const [table, fields] of columns) {
+      const names = new Set(all<{ name: string }>(db, `PRAGMA table_info(${table})`).map((column) => column.name));
+      for (const [column, type] of fields) if (!names.has(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+    }
+  });
   return db;
 }
 

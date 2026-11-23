@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { redactSecrets } from "@devpilot/security";
 
 export type RunOptions = {
@@ -10,6 +11,8 @@ export type RunOptions = {
   timeoutMs: number;
   maxOutputBytes?: number;
   signal?: AbortSignal;
+  input?: string;
+  onStdoutLine?: (line: string) => void;
   /** Variables extra permitidas (se suman al entorno mínimo). */
   env?: Record<string, string>;
 };
@@ -21,6 +24,7 @@ export type RunResult = {
   stdout: string;
   stderr: string;
   durationMs: number;
+  stdoutTruncated?: boolean;
 };
 
 const ENV_KEEP = ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "COMSPEC", "PATHEXT", "LANG"];
@@ -59,22 +63,51 @@ function killTree(pid: number | undefined): void {
 
 /** Ejecuta un proceso tipado sin shell, con timeout, cancelación, kill del árbol y salida acotada y redactada. */
 export function runCommand(opts: RunOptions): Promise<RunResult> {
+  if (opts.signal?.aborted) return Promise.resolve({ exitCode: null, timedOut: false, cancelled: true, stdout: "", stderr: "", durationMs: 0 });
   const max = opts.maxOutputBytes ?? 256 * 1024;
   const exe = resolveExecutable(opts.file, opts.args);
   const started = Date.now();
   return new Promise((resolve) => {
-    let stdout = "";
-    let stderr = "";
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let stdoutTruncated = false;
     let timedOut = false;
     let cancelled = false;
     let settled = false;
     const child = spawn(exe.file, exe.args, {
       cwd: opts.cwd, shell: false, windowsHide: true, detached: process.platform !== "win32",
-      env: minimalEnv(opts.env), stdio: ["ignore", "pipe", "pipe"],
+      env: minimalEnv(opts.env), stdio: [opts.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     });
-    const append = (cur: string, chunk: Buffer): string => (cur.length >= max ? cur : cur + chunk.toString("utf8"));
-    child.stdout.on("data", (c: Buffer) => { stdout = append(stdout, c); });
-    child.stderr.on("data", (c: Buffer) => { stderr = append(stderr, c); });
+    child.stdin?.on("error", () => undefined);
+    child.stdin?.end(opts.input);
+    const decoder = new StringDecoder("utf8");
+    let partial = "";
+    let discard = false;
+    const receiveLines = (value: string) => {
+      const lines = value.split("\n");
+      for (const line of lines.slice(0, -1)) {
+        if (!discard && partial.length + line.length <= max) opts.onStdoutLine?.((partial + line).replace(/\r$/, ""));
+        partial = "";
+        discard = false;
+      }
+      if (!discard) partial += lines.at(-1) ?? "";
+      if (partial.length > max) { partial = ""; discard = true; }
+    };
+    child.stdout!.on("data", (c: Buffer) => {
+      const accepted = c.subarray(0, Math.max(0, max - stdoutBytes));
+      if (accepted.length) stdout.push(accepted);
+      stdoutBytes += accepted.length;
+      stdoutTruncated ||= accepted.length !== c.length;
+      if (opts.onStdoutLine) receiveLines(decoder.write(c));
+    });
+    child.stdout!.on("end", () => { if (opts.onStdoutLine) receiveLines(decoder.end() + "\n"); });
+    child.stderr!.on("data", (c: Buffer) => {
+      const accepted = c.subarray(0, Math.max(0, max - stderrBytes));
+      if (accepted.length) stderr.push(accepted);
+      stderrBytes += accepted.length;
+    });
 
     const timer = setTimeout(() => { timedOut = true; killTree(child.pid); }, opts.timeoutMs);
     const onAbort = () => { cancelled = true; killTree(child.pid); };
@@ -88,8 +121,9 @@ export function runCommand(opts: RunOptions): Promise<RunResult> {
       opts.signal?.removeEventListener("abort", onAbort);
       resolve({
         exitCode, timedOut, cancelled,
-        stdout: redactSecrets(stdout.slice(0, max)),
-        stderr: redactSecrets((stderr + extraErr).slice(0, max)),
+        stdout: redactSecrets(Buffer.concat(stdout).toString("utf8")),
+        stderr: redactSecrets((Buffer.concat(stderr).toString("utf8") + extraErr).slice(0, max)),
+        ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
         durationMs: Date.now() - started,
       });
     };
