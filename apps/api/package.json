@@ -1,0 +1,2 @@
+{ "name": "@devpilot/api", "version": "0.1.0", "private": true, "type": "module",
+  "dependencies": { "fastify": "^5.12.8", "@fastify/cookie": "^11.1.5", "@fastify/static": "^10.1.12" } }

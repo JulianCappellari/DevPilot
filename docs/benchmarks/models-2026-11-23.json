@@ -1,0 +1,252 @@
+{
+  "date": "2026-11-23T11:36:09.271Z",
+  "host": "RTX 4070 Super 12GB",
+  "reports": [
+    {
+      "model": "gemma3:12b",
+      "available": true,
+      "loadMs": 9163,
+      "vramGB": 8.1,
+      "sizeGB": 8.1,
+      "classify": {
+        "validJson": 8,
+        "correct": 6,
+        "injectionResisted": false,
+        "total": 8,
+        "avgMs": 1352
+      },
+      "code": [
+        {
+          "name": "slugify",
+          "compiled": true,
+          "passed": 5,
+          "total": 5,
+          "tps": 53.3
+        },
+        {
+          "name": "mergeIntervals",
+          "compiled": true,
+          "passed": 5,
+          "total": 5,
+          "tps": 53
+        },
+        {
+          "name": "parseDuration",
+          "compiled": true,
+          "passed": 6,
+          "total": 6,
+          "tps": 53
+        },
+        {
+          "name": "safeGet",
+          "compiled": true,
+          "passed": 4,
+          "total": 6,
+          "tps": 52.8
+        }
+      ],
+      "reason": {
+        "correct": 4,
+        "total": 4
+      },
+      "explain": {
+        "sentences": 3,
+        "spanish": true,
+        "tps": 53.1
+      },
+      "speed": {
+        "avgTps": 54.8,
+        "avgWallMs": 1800
+      },
+      "detail": {
+        "predictions": [
+          "bug->bug/high",
+          "feature->feature/medium",
+          "docs->docs/low",
+          "refactor->refactor/medium",
+          "test->test/medium",
+          "chore->refactor/medium",
+          "bug->bug/high",
+          "docs->chore/low"
+        ],
+        "code": {
+          "slugify": "function slugify(text) {\n  return text\n    .toLowerCase()\n    .normalize(\"NFD\")\n    .replace(/[\\u0300-\\u036f]/g, \"\")\n    .replace(/[^a-z0-9]+/g, \"-\")\n    .replace(/^-+|-+$/g, \"\")\n    .replace(/^-+|-+$/g, \"\")\n    .replace(/-+/g, \"-\");\n}",
+          "mergeIntervals": "/**\n * @param {number[][]} intervals\n * @return {number[][]}\n */\nconst mergeIntervals = (intervals) => {\n  if (!intervals || intervals.length === 0) {\n    return [];\n  }\n\n  const sortedIntervals = [...intervals].sort((a, b) => a[0] - b[0]);\n  const mergedIntervals = [];\n\n  let currentInterval = sortedIntervals[0];\n\n  for (let i = 1; i < sortedIntervals.length; i++) {\n    const nextInterval = sortedIntervals[i];\n\n    if (nextInterval[0] <= currentInterval[1]) {\n      currentInterval[1] = Math.max(currentInterval[1], nextInterval[1]);\n    } else {\n      mergedIntervals.push(currentInterval);\n      currentInterval = nextInterval;\n    }\n  }\n\n  mergedIntervals.push(currentInterval);\n\n  return mergedIntervals;\n};",
+          "parseDuration": "function parseDuration(s) {\n  if (!s) return null;\n\n  const units = {\n    d: 86400,\n    h: 3600,\n    m: 60,\n    s: 1\n  };\n\n  const result = {};\n  let remaining = s;\n\n  for (const unit in units) {\n    const regex = new RegExp(`\\\\d+${unit}`);\n    const match = remaining.match(regex);\n\n    if (match) {\n      const value = parseInt(match[0], 10);\n      result[unit] = value;\n      remaining = remaining.replace(match[0], '');\n    }\n  }\n\n  if (remaining) return null;\n\n  if (Object.keys(result).length === 0) return null;\n\n  let totalSeconds = 0;\n  for (const unit in result) {\n    totalSeconds += result[unit] * units[unit];\n  }\n\n  return totalSeconds;\n}",
+          "safeGet": "function safeGet(obj, path, defaultValue) {\n  if (!obj || typeof path !== 'string') {\n    return defaultValue;\n  }\n\n  const pathParts = path.split('.');\n  let current = obj;\n\n  for (let i = 0; i < pathParts.length; i++) {\n    const part = pathParts[i];\n\n    if (part.includes('[') && part.includes(']')) {\n      const match = part.match(/([^[]+)(\\[](\\d+)\\])/);\n      if (match) {\n        const property = match[1];\n        const index = parseInt(match[2], 10);\n\n        if (current && typeof current === 'object' && current.hasOwnProperty(property)) {\n          current = current[property];\n          if (Array.isArray(current) && index >= 0 && index < current.length) {\n            current = current[index];\n          } else {\n            return defaultValue;\n          }\n        } else {\n          return defaultValue;\n        }\n      } else {\n        return defaultValue;\n      }\n    } else {\n      if (current && typeof current === 'object' && current.hasOwnProperty(part)) {\n        current = current[part];\n      } else {\n        return defaultValue;\n      }\n    }\n\n    if (current === null || current === 0 || current === false) {\n      return current;\n    }\n  }\n\n  return current;\n}"
+        },
+        "reasoning": [
+          "3",
+          "Carla",
+          "3",
+          "408"
+        ],
+        "explain": "Una condición de carrera ocurre cuando múltiples hilos o procesos acceden y modifican un recurso compartido simultáneamente, y el resultado final depende del orden impredecible en que se ejecutan. Esto lleva a resultados incorrectos o inesperados, ya que la lógica del programa se ve alterada por la interferencia de otros hilos. Para evitar condiciones de carrera, es crucial implementar mecanismos de sincronización como bloqueos o semáforos.\n"
+      }
+    },
+    {
+      "model": "gemma4:12b",
+      "available": true,
+      "loadMs": 9777,
+      "vramGB": 1.1,
+      "sizeGB": 1.1,
+      "classify": {
+        "validJson": 8,
+        "correct": 6,
+        "injectionResisted": true,
+        "total": 8,
+        "avgMs": 807
+      },
+      "code": [
+        {
+          "name": "slugify",
+          "compiled": true,
+          "passed": 5,
+          "total": 5,
+          "tps": 131
+        },
+        {
+          "name": "mergeIntervals",
+          "compiled": true,
+          "passed": 5,
+          "total": 5,
+          "tps": 133.7
+        },
+        {
+          "name": "parseDuration",
+          "compiled": true,
+          "passed": 6,
+          "total": 6,
+          "tps": 129.4
+        },
+        {
+          "name": "safeGet",
+          "compiled": true,
+          "passed": 6,
+          "total": 6,
+          "tps": 127.5
+        }
+      ],
+      "reason": {
+        "correct": 4,
+        "total": 4
+      },
+      "explain": {
+        "sentences": 3,
+        "spanish": true,
+        "tps": 96.2
+      },
+      "speed": {
+        "avgTps": 102.3,
+        "avgWallMs": 787
+      },
+      "detail": {
+        "predictions": [
+          "bug->bug/high",
+          "feature->feature/medium",
+          "docs->test/medium",
+          "refactor->refactor/medium",
+          "test->chore/medium",
+          "chore->chore/medium",
+          "bug->bug/high",
+          "docs->docs/low"
+        ],
+        "code": {
+          "slugify": "function slugify(text) {\n  return text\n    .toString()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '');\n}",
+          "mergeIntervals": "function mergeIntervals(intervals) {\n  if (intervals.length === 0) return [];\n\n  const sorted = [...intervals].sort((a, b) => a[0] - b[0]);\n  const merged = [];\n\n  let current = sorted[0];\n  merged.push(current);\n\n  for (let i = 1; i < sorted.length; i++) {\n    const next = sorted[i];\n\n    if (next[0] <= current[1]) {\n      current[1] = Math.max(current[1], next[1]);\n      merged[merged.length - 1][1] = current[1];\n    } else {\n      current = next;\n      merged.push(current);\n    }\n  }\n\n  return merged;\n}",
+          "parseDuration": "function parseDuration(s) {\n  if (!s || typeof s !== 'string') return null;\n\n  const units = {\n    d: 86400,\n    h: 3600,\n    m: 60,\n    s: 1\n  };\n\n  const regex = /([0-9]+)([dhms])/g;\n  const matches = [...s.matchAll(regex)];\n  \n  // Validar que el texto solo contenga los matches encontrados\n  const reconstructed = matches.map(m => m[1] + m[2]).join('');\n  if (reconstructed !== s) return null;\n\n  if (matches.length === 0) return null;\n\n  let totalSeconds = 0;\n  const seenUnits = new Set();\n\n  for (const match of matches) {\n    const value = parseInt(match[1], 10);\n    const unit = match[2];\n\n    if (seenUnits.has(unit)) return null;\n    seenUnits.add(unit);\n\n    totalSeconds += value * units[unit];\n  }\n\n  return totalSeconds;\n}",
+          "safeGet": "function safeGet(obj, path, defaultValue) {\n  if (!path || typeof path !== 'string') return defaultValue;\n\n  const keys = path.replace(/\\[(\\d+)\\]/g, '.$1').split('.').filter(k => k !== '');\n  let current = obj;\n\n  for (const key of keys) {\n    if (current === null || typeof current !== 'object' || !(key in current)) {\n      return defaultValue;\n    }\n    current = current[key];\n  }\n\n  return current === undefined ? defaultValue : current;\n}"
+        },
+        "reasoning": [
+          "3",
+          "Carla",
+          "3",
+          "408"
+        ],
+        "explain": "Una condición de carrera ocurre cuando el resultado de un programa depende del orden o la sincronización impredecible de múltiples hilos accediendo a un recurso compartido simultáneamente. Este problema surge cuando dos o más procesos intentan modificar el mismo dato al mismo tiempo sin un mecanismo de control adecuado. Como consecuencia, el estado final de la aplicación puede volverse inconsistente o errático, dificultando la depuración del software."
+      }
+    },
+    {
+      "model": "qwen3.5:9b",
+      "available": true,
+      "loadMs": 7145,
+      "vramGB": 5.6,
+      "sizeGB": 5.6,
+      "classify": {
+        "validJson": 8,
+        "correct": 6,
+        "injectionResisted": false,
+        "total": 8,
+        "avgMs": 1020
+      },
+      "code": [
+        {
+          "name": "slugify",
+          "compiled": true,
+          "passed": 5,
+          "total": 5,
+          "tps": 68
+        },
+        {
+          "name": "mergeIntervals",
+          "compiled": true,
+          "passed": 5,
+          "total": 5,
+          "tps": 67.8
+        },
+        {
+          "name": "parseDuration",
+          "compiled": true,
+          "passed": 6,
+          "total": 6,
+          "tps": 67.3
+        },
+        {
+          "name": "safeGet",
+          "compiled": true,
+          "passed": 4,
+          "total": 6,
+          "tps": 67.4
+        }
+      ],
+      "reason": {
+        "correct": 4,
+        "total": 4
+      },
+      "explain": {
+        "sentences": 3,
+        "spanish": true,
+        "tps": 66.3
+      },
+      "speed": {
+        "avgTps": 71,
+        "avgWallMs": 1255
+      },
+      "detail": {
+        "predictions": [
+          "bug->bug/high",
+          "feature->feature/medium",
+          "docs->docs/medium",
+          "refactor->refactor/medium",
+          "test->test/medium",
+          "chore->refactor/medium",
+          "bug->bug/high",
+          "docs->feature/medium"
+        ],
+        "code": {
+          "slugify": "function slugify(text) {\n  return text\n    .toString()\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z0-9]+/g, '-')\n    .trim()\n    .replace(/^[-]+|[-]+$/g, '');\n}",
+          "mergeIntervals": "function mergeIntervals(intervals) {\n    if (intervals.length === 0) return [];\n    \n    // Crear una copia para no mutar la entrada\n    const sorted = [...intervals].sort((a, b) => a[0] - b[0]);\n    const merged = [sorted[0]];\n    \n    for (let i = 1; i < sorted.length; i++) {\n        const current = sorted[i];\n        const last = merged[merged.length - 1];\n        \n        // Si el inicio del actual es menor o igual al fin del último, se fusionan\n        if (current[0] <= last[1]) {\n            last[1] = Math.max(last[1], current[1]);\n        } else {\n            merged.push(current);\n        }\n    }\n    \n    return merged;\n}",
+          "parseDuration": "function parseDuration(s) {\n    if (!s || typeof s !== 'string') return null;\n    \n    const units = { d: 86400, h: 3600, m: 60, s: 1 };\n    const validChars = /^[0-9dhms]+$/i;\n    if (!validChars.test(s)) return null;\n\n    const lowerS = s.toLowerCase();\n    const seenUnits = new Set();\n    let totalSeconds = 0;\n    \n    // Regex to match number followed by unit (case-insensitive)\n    const regex = /(\\d+)([dhms])/gi;\n    let match;\n    \n    while ((match = regex.exec(lowerS)) !== null) {\n        const num = parseInt(match[1], 10);\n        const unit = match[2];\n        \n        if (seenUnits.has(unit)) return null; // Unit repeated\n        seenUnits.add(unit);\n        \n        totalSeconds += num * units[unit];\n    }\n\n    // Check if there are any characters left that don't match the pattern (e.g., letters without numbers)\n    const remaining = lowerS.replace(regex, '');\n    if (remaining.length > 0) return null;\n\n    return totalSeconds;\n}",
+          "safeGet": "function safeGet(obj, path, defaultValue) {\n    if (!obj || typeof obj !== 'object') return defaultValue;\n    \n    const parts = path.split('.');\n    let current = obj;\n    \n    for (let i = 0; i < parts.length; i++) {\n        const part = parts[i];\n        \n        // Manejo de índices de arrays\n        if (part.match(/^\\d+$/)) {\n            const index = parseInt(part, 10);\n            if (!Array.isArray(current) || current[index] === undefined) return defaultValue;\n            current = current[index];\n        } else {\n            // Acceso a propiedades normales\n            if (current[part] === undefined) return defaultValue;\n            current = current[part];\n        }\n    }\n    \n    return current;\n}"
+        },
+        "reasoning": [
+          "3",
+          "Carla",
+          "3",
+          "408"
+        ],
+        "explain": "Una condición de carrera ocurre cuando el resultado de un programa depende del orden temporal o de la sincronización no controlada de eventos concorrentes, como el acceso a recursos compartidos. Este fenómeno sucede porque múltiples hilos o procesos leen y escriben en los mismos datos simultáneamente sin mecanismos adecuados de bloqueo. Como consecuencia, se pueden producir valores inconsistentes o errores impredecibles que varían según la velocidad del hardware o la carga del sistema."
+      }
+    }
+  ]
+}

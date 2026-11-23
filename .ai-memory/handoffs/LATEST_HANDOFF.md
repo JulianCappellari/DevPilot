@@ -1,0 +1,15 @@
+# Latest handoff
+- From agent: Claude Code (Sonnet 5.5)
+- To agent: any
+- Timestamp: 2026-11-23
+- Branch / HEAD / dirty files: main / sin commits / todo sin commitear
+- Active task ID: T-20261123-001
+- Prompt IDs: P-20261123-001
+- Status: PARTIAL
+- Verified completed work: monorepo npm workspaces; paquetes domain (estados tarea/run, políticas, aprobaciones, QA), security (paths, redacción, allowlist), contracts (Zod, envelope, SSE), providers (AgentProvider + MockProvider). Un bug real hallado por tests y corregido: redacción no cubría JSON con clave entrecomillada.
+- Unfinished work and known failures: todo lo demás de la spec (API, UI, DB, worker, Ollama, Codex, backups, PWA). Sin fallos conocidos.
+- Tests and commands: `npm run typecheck` PASS; `npm run lint` PASS; `npx vitest run --coverage` 56/56 PASS (98,57 % ramas).
+- Decisions / invariants to preserve: ver docs/architecture/ADR.md (ADR-009..013) y PROJECT_CONTEXT. No commitear ni hacer push sin pedido del usuario.
+- Next action: spec §16.1 paso 03 (PostgreSQL por Docker + Prisma + login). Antes, confirmar que Docker Desktop está corriendo.
+- Required documents: ../PROJECT_CONTEXT.md, ../ACTIVE_TASK.md, spec PDF (Downloads); texto extraído solo en scratchpad temporal.
+- Confidence and freshness: alta para lo verificado hoy; spec no certifica integraciones externas.

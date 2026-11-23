@@ -1,0 +1,13 @@
+# Active task
+- Status: DONE (MVP funcional con alcance acotado; ver limitaciones)
+- Task ID: T-20261123-002
+- Prompt IDs: P-20261123-002
+- Agent/model: Claude Code, Sonnet 5.5
+- Updated: 2026-11-23
+- Branch / HEAD / dirty files: main / sin commits / todo sin commitear
+- Goal and acceptance criteria: programa completo y funcional de punta a punta segun DP-SPEC-001
+- Verified progress (iteracion 2): proveedor ollama-local (gemma4:12b) probado E2E con modelo real, filtros/edicion/archivo de tareas, PWA. typecheck/lint PASS, vitest 109/109, audit 0. Antes: API Fastify + SQLite, auth/CSRF, roots/proyectos, tareas, cola+worker, worktrees, checks, diff, review por hash, SSE, Ollama real, UI vanilla. typecheck PASS, lint PASS, vitest 76/76 PASS, audit 0 vulns. Flujo completo recorrido a mano en navegador: PASS.
+- Files edited: apps/api, apps/worker, apps/web/public, packages/runner, packages/storage, packages/providers, README, ADR
+- Tests: 109 PASS (unit+integracion+E2E API); UI verificada manualmente (escritorio y movil). NOT_RUN: carga, caos real, WCAG automatizado, CI remoto.
+- Blockers / unknowns: Codex sin integrar (interfaz por validar); PostgreSQL no usado; sin sandbox de procesos.
+- Exact next safe action (actualizado): elegir entre integrar Codex (spike F0), sandbox en contenedor (Docker ya disponible), PWA/Tailscale, GitHub PR, o migrar a PostgreSQL.

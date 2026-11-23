@@ -1,0 +1,39 @@
+{
+  "name": "devpilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Plataforma personal local-first para orquestación y supervisión de agentes de programación.",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "check": "npm run typecheck && npm run lint && npm run test:run",
+    "start": "tsx apps/api/src/main.ts",
+    "dev": "tsx watch apps/api/src/main.ts",
+    "setup": "tsx apps/api/src/cli.ts setup",
+    "reset-password": "tsx apps/api/src/cli.ts reset-password",
+    "demo": "tsx apps/api/src/cli.ts demo",
+    "backup": "tsx apps/api/src/cli.ts backup",
+    "bench:models": "tsx apps/api/src/bench-models.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^5.1.1",
+    "eslint": "^10.15.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.1"
+  }
+}
