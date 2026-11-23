@@ -1,13 +1,19 @@
 # Active task
-- Status: DONE (MVP funcional con alcance acotado; ver limitaciones)
-- Task ID: T-20261123-002
-- Prompt IDs: P-20261123-002
-- Agent/model: Claude Code, Sonnet 5.5
+- Estado de T-20261123-005: DONE. Implementación del SRS y validación local completadas en `codex/devpilot-release`. La matriz RF-001–042 quedó en `docs/architecture/TRAZABILIDAD.md`.
+- Estado de T-20261123-006: IN_PROGRESS. El propietario autorizó publicar una rama y abrir PR en borrador para CI. Commits de runtime `167f5e9` e interfaz `1adcfa7`.
+- Verificaciones: 136/136 pruebas con Docker/Codex/Ollama, 84,31 % de ramas y 4/4 Playwright con axe. El corte real, la restauración y la prueba de Codex desde el worker separado volvieron a pasar. Carga p95 4,61 ms. Benchmark Gemma con ejecución en Docker: 22/22 checks de código y 8/8 clasificaciones con JSON válido.
+- Windows: Codex ya estaba autenticado. GitHub CLI instalado, autenticación pendiente de confirmación del propietario. Tarea `DevPilot Backup` registrada a las 03:00 de Argentina y ejecutada manualmente con resultado 0 y backup verificable.
+- Siguiente: publicar rama, abrir PR en borrador y comprobar CI. Completar lecturas reales de GitHub si hay credencial, y verificar Tailscale/iPhone si la cuenta y el dispositivo están disponibles.
+
+## Checkpoint anterior
+- Status: DONE para implementación y validación local. Despliegue en iPhone/GitHub real pendiente de acceso externo.
+- Task ID: T-20261123-004
+- Prompt ID: P-20261123-004
+- Agent: Codex
 - Updated: 2026-11-23
-- Branch / HEAD / dirty files: main / ab96400 publicado en origin (github.com/JulianCappellari/DevPilot) / CI verde
-- Goal and acceptance criteria: programa completo y funcional de punta a punta segun DP-SPEC-001
-- Verified progress (iteracion 2): proveedor ollama-local (gemma4:12b) probado E2E con modelo real, filtros/edicion/archivo de tareas, PWA. typecheck/lint PASS, vitest 109/109, audit 0. Antes: API Fastify + SQLite, auth/CSRF, roots/proyectos, tareas, cola+worker, worktrees, checks, diff, review por hash, SSE, Ollama real, UI vanilla. typecheck PASS, lint PASS, vitest 76/76 PASS, audit 0 vulns. Flujo completo recorrido a mano en navegador: PASS.
-- Files edited: apps/api, apps/worker, apps/web/public, packages/runner, packages/storage, packages/providers, README, ADR
-- Tests: 109 PASS (unit+integracion+E2E API); UI verificada manualmente (escritorio y movil). NOT_RUN: carga, caos real, WCAG automatizado, CI remoto.
-- Blockers / unknowns: Codex sin integrar (interfaz por validar); PostgreSQL no usado; sin sandbox de procesos.
-- Exact next safe action (actualizado): elegir entre integrar Codex (spike F0), sandbox en contenedor (Docker ya disponible), PWA/Tailscale, GitHub PR, o migrar a PostgreSQL.
+- Baseline: main @ 567d617. Cambios del usuario en package.json y docs/INSTRUCTIVO.md preservados.
+- Goal: Implementar y validar los pendientes de docs/INSTRUCTIVO.md, preservando controles de autorización, aislamiento, auditoría y revisión.
+- Implementación: runner Docker, proveedor Codex con JSONL y consentimiento, origen HTTPS/PWA, backup y restore, worker separado, métricas, contexto Markdown y PR opcional con autorización propia. Diagrama C4, runbook y demo MP4.
+- Verificación: 130 tests con flags de Docker, Ollama y Codex PASS; cobertura de ramas 84,31 %; Playwright + axe 2/2 PASS. Corte real y restauración PASS. Carga p95 4,25–9,25 ms. Codex real en repo sintético pasó consentimiento, aprobación inicial, worktree, QA y aprobación del commit con worker separado. Script Scheduler validado con WhatIf.
+- Entorno local: `.env` ignorado por Git creado sin secretos, con Docker y Codex write. Existe propietario en la base local. GitHub desactivado por defecto.
+- Próximo paso operativo: iniciar la app local con `npm start`. Para iPhone configurar la tailnet y HTTPS. Para PR real instalar/autenticar GitHub CLI y habilitar el flag por decisión del propietario. SQLite soporta el despliegue de un escritor.
