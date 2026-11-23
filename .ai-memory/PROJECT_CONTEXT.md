@@ -2,7 +2,7 @@
 - Memory schema: 2.0
 - Updated: 2026-11-23
 - Last agent: Claude Code (Sonnet 5.5)
-- Branch/HEAD: main, sin commits (repo git inicializado en esta sesión)
+- Branch/HEAD: main @ ab96400, publicado en https://github.com/JulianCappellari/DevPilot (repo publico, CI GitHub Actions: success)
 - Evidence freshness: VERIFIED con typecheck + lint + vitest el 2026-11-23
 
 ## Purpose and scope

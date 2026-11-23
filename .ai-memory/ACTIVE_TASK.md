@@ -4,7 +4,7 @@
 - Prompt IDs: P-20261123-002
 - Agent/model: Claude Code, Sonnet 5.5
 - Updated: 2026-11-23
-- Branch / HEAD / dirty files: main / sin commits / todo sin commitear
+- Branch / HEAD / dirty files: main / ab96400 publicado en origin (github.com/JulianCappellari/DevPilot) / CI verde
 - Goal and acceptance criteria: programa completo y funcional de punta a punta segun DP-SPEC-001
 - Verified progress (iteracion 2): proveedor ollama-local (gemma4:12b) probado E2E con modelo real, filtros/edicion/archivo de tareas, PWA. typecheck/lint PASS, vitest 109/109, audit 0. Antes: API Fastify + SQLite, auth/CSRF, roots/proyectos, tareas, cola+worker, worktrees, checks, diff, review por hash, SSE, Ollama real, UI vanilla. typecheck PASS, lint PASS, vitest 76/76 PASS, audit 0 vulns. Flujo completo recorrido a mano en navegador: PASS.
 - Files edited: apps/api, apps/worker, apps/web/public, packages/runner, packages/storage, packages/providers, README, ADR
