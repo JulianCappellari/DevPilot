@@ -1,9 +1,10 @@
 # Active task
 - Estado de T-20261123-005: DONE. Implementación del SRS y validación local completadas en `codex/devpilot-release`. La matriz RF-001–042 quedó en `docs/architecture/TRAZABILIDAD.md`.
-- Estado de T-20261123-006: IN_PROGRESS. El propietario autorizó publicar una rama y abrir PR en borrador para CI. Commits de runtime `167f5e9` e interfaz `1adcfa7`.
+- Estado de T-20261123-006: entrega publicada y CI aprobado. PR #1 en borrador en `codex/devpilot-release`. Verificación en el iPhone y autenticación local de GitHub CLI dependen de los accesos del propietario.
 - Verificaciones: 136/136 pruebas con Docker/Codex/Ollama, 84,31 % de ramas y 4/4 Playwright con axe. El corte real, la restauración y la prueba de Codex desde el worker separado volvieron a pasar. Carga p95 4,61 ms. Benchmark Gemma con ejecución en Docker: 22/22 checks de código y 8/8 clasificaciones con JSON válido.
-- Windows: Codex ya estaba autenticado. GitHub CLI instalado, autenticación pendiente de confirmación del propietario. Tarea `DevPilot Backup` registrada a las 03:00 de Argentina y ejecutada manualmente con resultado 0 y backup verificable.
-- Siguiente: publicar rama, abrir PR en borrador y comprobar CI. Completar lecturas reales de GitHub si hay credencial, y verificar Tailscale/iPhone si la cuenta y el dispositivo están disponibles.
+- Windows: Codex ya estaba autenticado. GitHub CLI 2.105.0 instalado. Tarea `DevPilot Backup` registrada a las 03:00 de Argentina y ejecutada con resultado 0, SQLite íntegro y configuración legible.
+- DevPilot en ejecución en loopback. Tailscale Serve HTTPS privado probado desde Windows, sin Funnel, con cookie segura y origen configurados en el archivo local ignorado. El iPhone reportó fallo de resolución y Windows no encontró ningún par en la tailnet.
+- Siguiente: vincular el iPhone a la misma tailnet y verificar el login. Completar la credencial de GitHub CLI para probar lectura desde DevPilot. Ya se creó y leyó el PR real con el conector de GitHub.
 
 ## Checkpoint anterior
 - Status: DONE para implementación y validación local. Despliegue en iPhone/GitHub real pendiente de acceso externo.

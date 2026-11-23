@@ -32,6 +32,12 @@ Validación: 136/136 tests con Docker/Codex/Ollama, 84,31 % ramas, 4/4 Playwrigh
 
 El propietario autorizó la rama de entrega y el PR en borrador. Se prepararon los commits `167f5e9` y `1adcfa7`, preservando el rediseño y las licencias de terceros. Se instaló GitHub CLI y se inició su autenticación oficial. Codex ya estaba instalado y autenticado. La tarea de backup está registrada y produjo una copia verificable al probarla.
 
+### T-20261123-006 · Entrega y despliegue en Windows
+
+PR #1 abierto como borrador y rama publicada. El primer CI detectó que el script de empaquetado usaba `process` sin importarlo. Se corrigió en `243e55e` y el workflow 45283460772 pasó completo, incluidos Playwright, recuperación y Docker Linux. Auditoría de producción local: 0 vulnerabilidades.
+
+Tailscale 1.104.7 quedó instalado y autenticado por el propietario. Serve responde sólo en la tailnet, y DevPilot escucha sólo en `127.0.0.1:4000`. Se verificaron HTTPS, manifest PWA y protección de la sesión. En la prueba inicial, Safari no resolvió el nombre y Windows registró cero pares en la tailnet. La vinculación del iPhone y la autenticación de GitHub CLI dependen del propietario. La creación del borrador y la lectura real de GitHub se verificaron con el conector. La demo local de 3:12 se inspeccionó en su versión previa de la UI.
+
 ## T-20261123-006 DONE (2026-11-23, Claude Code)
 
 Rediseño UX/UI completo de apps/web: tokens OKLCH con tema claro/oscuro y selector manual, shell persistente con navegación lateral y barra inferior móvil, iconos SVG, fases de ejecución, informes con barras, esqueletos de carga, View Transitions y Motion mini (toasts, diálogos, pulso de estado). Tipografías Inter y JetBrains Mono locales. Decisiones y librerías descartadas en `docs/architecture/UI.md`. Archivos: `styles.css`, `app.js`, `index.html`, `sw.js` (cache v4), `ui/*`, `vendor/motion.js`, `fonts/`, `scripts/vendor-ui.mjs`, `scripts/preview-ui.ts`, `eslint.config.js`, spec Playwright (+1 prueba de tema oscuro). Bug hallado: `replaceChildren` convertía `null` en texto "null" (corregido con filtro). Validación: `npm run check` 133/133 PASS; Playwright + axe 3/3 PASS (claro, oscuro, móvil); sin desbordes horizontales en 6 rutas a 375 px. No verificado: iPhone físico, navegadores no Chromium (View Transitions degrada a corte directo).

@@ -31,5 +31,5 @@ Ver [history/TASK_LOG.md](history/TASK_LOG.md) y [handoffs/LATEST_HANDOFF.md](ha
 
 ## Unknowns, risks and freshness
 - SQLite sigue siendo el almacenamiento compatible con un escritor. PostgreSQL es condicional a un despliegue multiescritor.
-- Tailscale e iPhone físico requieren la cuenta, el dispositivo y su configuración. GitHub real requiere cliente y credenciales.
+- Tailscale Serve ya responde por HTTPS privado desde Windows. Falta añadir el iPhone a la misma tailnet. GitHub CLI está instalado y el adaptador local requiere iniciar sesión con la cuenta autorizada.
 - Backups automáticos y restauración verificados. La tarea programada Windows quedó registrada y una ejecución manual produjo una copia verificable.

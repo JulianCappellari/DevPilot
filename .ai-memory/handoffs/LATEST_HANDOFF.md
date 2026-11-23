@@ -4,9 +4,9 @@
 
 - T-005 DONE. Matriz RF-001–042 en `docs/architecture/TRAZABILIDAD.md`. Implementación y validación local sobre la base existente de SQLite y UI web.
 - 136/136 tests reales y unitarios PASS, 84,31 % de ramas, 4/4 Playwright con axe. La consulta GitHub usa un doble en API y navegador. Carga p95 4,61 ms, corte y restauración PASS. Codex real entregó el resultado revisado con worker separado. Resumen Gemma JSON PASS y 22/22 pruebas del benchmark aislado PASS.
-- T-006 en progreso. Rama `codex/devpilot-release`, commits backend `167f5e9` y UI `1adcfa7`. El propietario autorizó push de esa rama y PR en borrador. Codex ya autenticado. GitHub CLI instalado y login web iniciado.
+- T-006 entrega publicada. Rama `codex/devpilot-release`, PR #1 en borrador. CI 45283460772 PASS en `243e55e`, luego de corregir el lint de `scripts/vendor-ui.mjs`. Se creó y consultó el PR real con el conector de GitHub. GitHub CLI instalado y login pendiente.
 - Se registró `DevPilot Backup` diario a las 03:00 de Argentina. La prueba manual del Programador devolvió resultado 0 y `npm run backup:config` leyó la copia creada.
-- Pendiente de verificación: PR y CI de la rama, autenticación/lectura GitHub real, tailnet e iPhone físico. La integración de PR desde DevPilot sigue con evidencia simulada.
+- Tailscale instalado y autenticado. Serve HTTPS privado responde desde Windows y la API escucha en loopback. Cookie segura y origen configurados en `.env` local. Inicialmente Safari no pudo resolver el nombre y Windows mostró cero pares en la tailnet. Próximo paso: vincular el iPhone y probar el login. La creación de PR desde DevPilot conserva evidencia simulada hasta autenticar GitHub CLI y autorizar un caso real propio.
 
 ## T-20261123-004 · Codex · 2026-11-23
 

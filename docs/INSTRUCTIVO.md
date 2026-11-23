@@ -162,6 +162,7 @@ Abrí **Informes** para ver resultados por estado, tiempos y ejecuciones por ori
 | Ollama no encuentra el modelo | Verificá `ollama list` y `OLLAMA_MODEL` |
 | `EADDRINUSE` | Ajustá `PORT` y el destino de Tailscale Serve si corresponde |
 | `403 Origen no permitido` | Cargá la URL HTTPS exacta en `ALLOWED_ORIGINS` |
+| Safari no encuentra el servidor `.ts.net` | Abrí Tailscale en el iPhone. Conectalo a la misma tailnet y comprobá que aparece la PC en la lista de dispositivos. MagicDNS resuelve nombres dentro de esa red. |
 | `403 Token CSRF inválido` | Cerrá sesión y volvé a entrar |
 | Ejecución `UNKNOWN` | Conservá la evidencia y prepará un intento nuevo |
 | Restauración rechazada | Detené la API y el worker que usan el directorio |
