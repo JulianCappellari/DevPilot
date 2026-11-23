@@ -9,6 +9,7 @@ export const ALLOWLISTED_CHECKS = {
   lint: { file: "npm", args: ["run", "lint"] },
   test: { file: "npm", args: ["run", "test", "--", "--run"] },
   typecheck: { file: "npm", args: ["run", "typecheck"] },
+  build: { file: "npm", args: ["run", "build"] },
 } as const satisfies Record<string, TypedCommand>;
 
 export type CheckId = keyof typeof ALLOWLISTED_CHECKS;

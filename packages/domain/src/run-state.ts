@@ -10,7 +10,7 @@ export type RunState = (typeof RUN_STATES)[number];
 const TRANSITIONS: Readonly<Record<RunState, readonly RunState[]>> = {
   PENDING_APPROVAL: ["QUEUED", "CANCELLED", "BLOCKED"],
   QUEUED: ["RUNNING", "CANCELLED", "BLOCKED"],
-  RUNNING: ["SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT", "PARTIAL", "UNKNOWN"],
+  RUNNING: ["SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT", "PARTIAL", "UNKNOWN", "BLOCKED"],
   UNKNOWN: ["FAILED", "CANCELLED"], // reconciliación tras reinicio (CU-11)
   SUCCEEDED: [], FAILED: [], CANCELLED: [], TIMED_OUT: [], PARTIAL: [], BLOCKED: [],
 };

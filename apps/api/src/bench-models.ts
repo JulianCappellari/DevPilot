@@ -3,12 +3,18 @@
  * Uso: npx tsx apps/api/src/bench-models.ts [modelo ...]
  * Mismas preguntas, temperatura 0 y semilla fija para todos los modelos. Los resultados son de esta máquina.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import vm from "node:vm";
+import { DockerSandbox, dockerAvailable } from "@devpilot/runner";
 import { ClassificationSchema } from "./classify.js";
 
 const BASE = process.env["OLLAMA_BASE_URL"] ?? "http://127.0.0.1:11434";
+const endpoint = new URL(BASE);
+if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password ||
+    !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname)) throw new Error("El benchmark requiere Ollama local");
+if (!await dockerAvailable(process.cwd())) throw new Error("El benchmark requiere Docker Linux para evaluar código en un contenedor sin red");
 const MODELS = process.argv.slice(2).length ? process.argv.slice(2) : ["gemma3:12b", "gemma4:12b", "qwen3.5:9b"];
 
 type GenResult = { text: string; wallMs: number; evalCount: number; tps: number; loadMs: number; error?: string };
@@ -19,7 +25,7 @@ async function generate(model: string, prompt: string, opts: { format?: object; 
     model, prompt, stream: false, ...(think === undefined ? {} : { think }), ...(opts.format ? { format: opts.format } : {}),
     ...(opts.keepAlive !== undefined ? { keep_alive: opts.keepAlive } : {}), options: { temperature: 0, seed: 7, num_predict: opts.numPredict },
   });
-  const call = (think: boolean | undefined) => fetch(new URL("/api/generate", BASE), { method: "POST", headers: { "content-type": "application/json" }, body: body(think), signal: AbortSignal.timeout(240_000) });
+  const call = (think: boolean | undefined) => fetch(new URL("/api/generate", BASE), { method: "POST", headers: { "content-type": "application/json" }, body: body(think), signal: AbortSignal.timeout(240_000), redirect: "error" });
   try {
     let r = await call(false); // sin modo de razonamiento, igual que la app
     if (r.status === 400) r = await call(undefined);
@@ -75,13 +81,27 @@ function extractCode(text: string): string {
   const m = /```(?:javascript|js|typescript|ts)?\s*\n([\s\S]*?)```/i.exec(text);
   return (m ? m[1]! : text).trim();
 }
-function runCode(code: string, t: CodeTask): { passed: number; compiled: boolean } {
+async function runCode(code: string, t: CodeTask): Promise<{ passed: number; compiled: boolean }> {
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "devpilot-bench-")));
+  const sandbox = new DockerSandbox(root, `run_${randomBytes(8).toString("hex")}`, 45_000, new AbortController().signal);
   try {
-    const ctx = vm.createContext({});
-    vm.runInContext(`${eqHelper}\n${code}\n;try{ ${t.tests} }catch(e){}`, ctx, { timeout: 2000 });
-    const r = vm.runInContext("__r", ctx) as { p: number; t: number };
-    return { passed: r.p, compiled: true };
-  } catch { return { passed: 0, compiled: false }; }
+    const harness = [
+      'const vm = require("node:vm");',
+      'const ctx = vm.createContext(Object.create(null), { codeGeneration: { strings: false, wasm: false } });',
+      `vm.runInContext(${JSON.stringify(code)}, ctx, { timeout: 1500 });`,
+      `const test = ${JSON.stringify(`(() => { ${eqHelper}\ntry { ${t.tests} } catch {} return __r.p; })()`)};`,
+      "console.log(vm.runInContext(test, ctx, { timeout: 2000 }));",
+    ].join("\n");
+    writeFileSync(path.join(root, "harness.cjs"), harness, "utf8");
+    if ((await sandbox.prepare()).exitCode !== 0) throw new Error("No se pudo preparar el benchmark Docker");
+    const result = await sandbox.check("benchmark", "node", ["/work/harness.cjs"]);
+    const passed = Number(result.stdout.trim());
+    const compiled = result.exitCode === 0 && /^\d+$/.test(result.stdout.trim()) && passed <= t.total;
+    return { passed: compiled ? passed : 0, compiled };
+  } finally {
+    await sandbox.close();
+    rmSync(root, { recursive: true, force: true });
+  }
 }
 
 // ---------- 3. Razonamiento y coherencia ----------
@@ -105,7 +125,7 @@ type ModelReport = {
 };
 
 async function installed(): Promise<string[]> {
-  const r = await fetch(new URL("/api/tags", BASE), { signal: AbortSignal.timeout(5000) });
+  const r = await fetch(new URL("/api/tags", BASE), { signal: AbortSignal.timeout(5000), redirect: "error" });
   return ((await r.json()) as { models: Array<{ name: string }> }).models.map((m) => m.name);
 }
 
@@ -131,7 +151,7 @@ async function benchModel(model: string): Promise<ModelReport> {
     } catch { rep.detail.predictions.push(`${c.expected}->INVALID`); if (c.injection) rep.classify.injectionResisted = false; }
   }
   rep.classify.avgMs = Math.round(cms / CLASSIFY.length);
-  const ps = (await (await fetch(new URL("/api/ps", BASE))).json()) as { models: Array<{ name: string; size: number; size_vram: number }> };
+  const ps = (await (await fetch(new URL("/api/ps", BASE), { signal: AbortSignal.timeout(5000), redirect: "error" })).json()) as { models: Array<{ name: string; size: number; size_vram: number }> };
   const loaded = ps.models.find((m) => m.name === model); // medido con el modelo ya cargado y usado
   if (loaded) { rep.vramGB = +(loaded.size_vram / 1e9).toFixed(1); rep.sizeGB = +(loaded.size / 1e9).toFixed(1); }
 
@@ -139,7 +159,7 @@ async function benchModel(model: string): Promise<ModelReport> {
     const r = await generate(model, `${t.prompt}\nRespondé sólo con el código JavaScript de la función, sin explicación.`, { numPredict: 700 });
     track(r);
     rep.detail.code[t.name] = extractCode(r.text);
-    const res = runCode(extractCode(r.text), t);
+    const res = await runCode(extractCode(r.text), t);
     rep.code.push({ name: t.name, compiled: res.compiled, passed: res.passed, total: t.total, tps: +r.tps.toFixed(1) });
   }
 
@@ -183,8 +203,9 @@ row("Código: total tests", (r) => `${r.code.reduce((a, c) => a + c.passed, 0)}/
 row("Razonamiento", (r) => `${r.reason.correct}/${r.reason.total}`);
 row("Explicación: oraciones (pedidas 3) / español", (r) => `${r.explain.sentences} / ${r.explain.spanish ? "sí" : "no"}`);
 
-const out = path.resolve("docs", "benchmarks");
+const out = path.resolve("data", "benchmarks");
 mkdirSync(out, { recursive: true });
-const file = path.join(out, `models-${new Date().toISOString().slice(0, 10)}.json`);
-writeFileSync(file, JSON.stringify({ date: new Date().toISOString(), host: "RTX 4070 Super 12GB", reports }, null, 2));
+const date = new Date().toISOString();
+const file = path.join(out, `models-${date.replace(/[:.]/g, "-")}.json`);
+writeFileSync(file, JSON.stringify({ date, platform: process.platform, codeSandbox: "docker", reports }, null, 2), { flag: "wx" });
 console.log(`\nResultados guardados en ${file}`);

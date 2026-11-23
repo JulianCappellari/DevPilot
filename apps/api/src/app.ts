@@ -7,13 +7,14 @@ import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { fail, ok, type ErrorCode } from "@devpilot/contracts";
 import type { AgentProvider } from "@devpilot/providers";
-import { all, audit, get, newId, nowIso, run, type Config, type DB } from "@devpilot/storage";
+import { all, audit, get, newId, nowIso, parseOrigin, run, type Config, type DB } from "@devpilot/storage";
 import { z } from "zod";
 import { LoginLimiter, authenticate, createSession, safeEqual, verifyPassword, type AuthContext } from "./auth.js";
 import { AppError, toHttpError } from "./errors.js";
 import { registerDomainRoutes } from "./routes.js";
+import type { GithubReader, PrPublisher } from "./github.js";
 
-export type AppDeps = { db: DB; config: Config; providers: Map<string, AgentProvider>; logger?: boolean };
+export type AppDeps = { db: DB; config: Config; providers: Map<string, AgentProvider>; logger?: boolean; prPublisher?: PrPublisher; githubReader?: GithubReader };
 
 declare module "fastify" {
   interface FastifyRequest { auth: AuthContext | null }
@@ -68,7 +69,12 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const mutating = !["GET", "HEAD", "OPTIONS"].includes(req.method);
     if (mutating) {
       const origin = req.headers.origin;
-      if (origin && new URL(origin).host !== req.headers.host) return sendFail(reply, req, new AppError("FORBIDDEN", "Origen no permitido", true));
+      if (origin !== undefined) {
+        const normalized = parseOrigin(origin);
+        const direct = parseOrigin(`${req.protocol}://${req.headers.host ?? ""}`);
+        if (!normalized || (normalized !== direct && !config.allowedOrigins.includes(normalized)))
+          return sendFail(reply, req, new AppError("FORBIDDEN", "Origen no permitido", true));
+      }
     }
     if (PUBLIC_PATHS.has(url)) return done();
     req.auth = authenticate(db, req.cookies[COOKIE]);

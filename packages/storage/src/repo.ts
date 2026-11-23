@@ -1,13 +1,28 @@
-import { transitionRun, transitionTask, type RunState, type TaskState } from "@devpilot/domain";
-import { get, nowIso, run, tx, type DB } from "./db.js";
+import { transitionRun, transitionTask, type CostOrigin, type RunState, type TaskState } from "@devpilot/domain";
+import { all, get, nowIso, run, tx, type DB } from "./db.js";
 
 export type TaskRow = { id: string; project_id: string; title: string; description: string | null; type: string; priority: string; state: TaskState; version: number; classification: string | null; archived: number; created_at: string; updated_at: string };
-export type RunRow = { id: string; task_id: string; provider_id: string; state: RunState; attempt: number; worktree_path: string | null; branch: string | null; base_commit: string | null; diff_hash: string | null; delivered_commit: string | null; version: number; error: string | null; cancel_requested: number; created_at: string; started_at: string | null; finished_at: string | null };
+export type RunRow = { id: string; task_id: string; provider_id: string; state: RunState; attempt: number; worktree_path: string | null; branch: string | null; base_commit: string | null; diff_hash: string | null; delivered_commit: string | null; version: number; error: string | null; cancel_requested: number; external_ack: number; created_at: string; started_at: string | null; finished_at: string | null;
+  requested_task_version: number | null; requested_project_version: number | null; write_scope: number | null; cost_origin: CostOrigin | null };
 export type ProjectRow = { id: string; name: string; root_id: string; repo_path: string; status: "ACTIVE" | "INACTIVE" | "ARCHIVED"; enabled_checks: string; version: number; created_at: string; updated_at: string };
 
 export const getTask = (db: DB, id: string) => get<TaskRow>(db, "SELECT * FROM task WHERE id = ?", id);
 export const getRun = (db: DB, id: string) => get<RunRow>(db, "SELECT * FROM run WHERE id = ?", id);
 export const getProject = (db: DB, id: string) => get<ProjectRow>(db, "SELECT * FROM project WHERE id = ?", id);
+
+export function taskPrerequisites(db: DB, id: string) {
+  return all<{ id: string; title: string; state: TaskState }>(db, "SELECT t.id,t.title,t.state FROM task_dependency d JOIN task t ON t.id=d.prerequisite_id WHERE d.task_id=? ORDER BY t.title,t.id", id);
+}
+
+export function dependencyReaches(db: DB, start: string, target: string): boolean {
+  return Boolean(get(db, `WITH RECURSIVE chain(id) AS (
+    SELECT ? UNION SELECT d.prerequisite_id FROM task_dependency d JOIN chain c ON d.task_id=c.id
+  ) SELECT id FROM chain WHERE id=?`, start, target));
+}
+
+export function hasPendingPrerequisites(db: DB, id: string): boolean {
+  return Boolean(get(db, "SELECT 1 FROM task_dependency d JOIN task t ON t.id=d.prerequisite_id WHERE d.task_id=? AND t.state<>'APPROVED' LIMIT 1", id));
+}
 
 /** Transición de tarea validada + CAS de versión + historial (RF-008). Lanza si es inválida o hay conflicto. */
 export function applyTaskTransition(db: DB, taskId: string, to: TaskState, actorId: string | null, reason: string | null, expectedVersion?: number): TaskRow {

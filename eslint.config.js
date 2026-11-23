@@ -2,7 +2,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["data/**", "node_modules/**", "coverage/**", "dist/**", ".ai-memory/**"] },
+  { ignores: ["data/**", "node_modules/**", "coverage/**", "dist/**", ".ai-memory/**", "playwright-report/**", "test-results/**", "apps/web/public/vendor/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -14,7 +14,7 @@ export default tseslint.config(
   { files: ["**/test/**"], rules: { "@typescript-eslint/no-explicit-any": "off" } },
   {
     files: ["apps/web/**"],
-    languageOptions: { globals: { document: "readonly", window: "readonly", fetch: "readonly", EventSource: "readonly", location: "readonly", history: "readonly", setTimeout: "readonly", clearTimeout: "readonly", setInterval: "readonly", clearInterval: "readonly", URLSearchParams: "readonly", FormData: "readonly", console: "readonly", AbortSignal: "readonly", navigator: "readonly", caches: "readonly", self: "readonly", URL: "readonly" } },
+    languageOptions: { globals: { document: "readonly", window: "readonly", fetch: "readonly", EventSource: "readonly", location: "readonly", history: "readonly", setTimeout: "readonly", clearTimeout: "readonly", setInterval: "readonly", clearInterval: "readonly", URLSearchParams: "readonly", FormData: "readonly", console: "readonly", AbortSignal: "readonly", navigator: "readonly", caches: "readonly", localStorage: "readonly", self: "readonly", URL: "readonly", Response: "readonly" } },
   },
   {
     // Sólo el runner del worker (futuro) podrá lanzar procesos.

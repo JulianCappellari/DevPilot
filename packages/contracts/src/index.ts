@@ -3,6 +3,8 @@ import { z } from "zod";
 /** Contratos de API v1 (spec §10). Validación en el borde del sistema. */
 export const TaskTypeSchema = z.enum(["bug", "feature", "refactor", "docs", "test", "chore"]);
 export const PrioritySchema = z.enum(["low", "medium", "high", "critical"]);
+export const TaskLabelsSchema = z.array(z.string().trim().min(1).max(30).regex(/^[\p{L}\p{N} _-]+$/u))
+  .max(10).transform((labels) => [...new Set(labels.map((label) => label.toLowerCase()))]);
 
 export const CreateTaskInputSchema = z
   .object({
@@ -12,6 +14,7 @@ export const CreateTaskInputSchema = z
     type: TaskTypeSchema,
     priority: PrioritySchema,
     acceptanceCriteria: z.array(z.string().trim().min(1).max(500)).max(50).default([]),
+    labels: TaskLabelsSchema.default([]),
   })
   .strict();
 export type CreateTaskInput = z.infer<typeof CreateTaskInputSchema>;
