@@ -2,14 +2,14 @@
 - From agent: Claude Code (Sonnet 5.5)
 - To agent: any
 - Timestamp: 2026-11-23
-- Branch / HEAD / dirty files: main / ab96400 publicado en origin (github.com/JulianCappellari/DevPilot) / CI verde
-- Active task ID: T-20261123-001
-- Prompt IDs: P-20261123-001
-- Status: PARTIAL
-- Verified completed work: monorepo npm workspaces; paquetes domain (estados tarea/run, políticas, aprobaciones, QA), security (paths, redacción, allowlist), contracts (Zod, envelope, SSE), providers (AgentProvider + MockProvider). Un bug real hallado por tests y corregido: redacción no cubría JSON con clave entrecomillada.
-- Unfinished work and known failures: todo lo demás de la spec (API, UI, DB, worker, Ollama, Codex, backups, PWA). Sin fallos conocidos.
-- Tests and commands: `npm run typecheck` PASS; `npm run lint` PASS; `npx vitest run --coverage` 56/56 PASS (98,57 % ramas).
-- Decisions / invariants to preserve: ver docs/architecture/ADR.md (ADR-009..013) y PROJECT_CONTEXT. No hacer push sin pedido del usuario (el primer push fue autorizado al dar la URL del repo).
-- Next action: spec §16.1 paso 03 (PostgreSQL por Docker + Prisma + login). Antes, confirmar que Docker Desktop está corriendo.
-- Required documents: ../PROJECT_CONTEXT.md, ../ACTIVE_TASK.md, spec PDF (Downloads); texto extraído solo en scratchpad temporal.
-- Confidence and freshness: alta para lo verificado hoy; spec no certifica integraciones externas.
+- Branch / HEAD / dirty files: main, publicado en origin (github.com/JulianCappellari/DevPilot, repo publico). CI GitHub Actions: success sobre ab96400.
+- Active task ID: T-20261123-003 (DONE). Anteriores: T-001 y T-002 DONE.
+- Prompt IDs: P-20261123-001..003
+- Status: DONE para el alcance del MVP; ver "Unfinished".
+- Verified completed work: API Fastify + SQLite (node:sqlite), auth scrypt/sesion httpOnly/CSRF/rate limit, roots y proyectos, tareas (filtros, edicion con version, archivo), cola durable + worker (cancel, timeout, UNKNOWN tras reinicio), worktrees, checks allowlisted, diff + aprobacion por hash, SSE, auditoria append-only, UI vanilla accesible con CSP estricta, PWA (sw solo cachea shell), clasificacion Ollama, proveedor ollama-local (gemma4:12b) probado con modelo real, benchmark de 3 modelos (docs/benchmarks).
+- Unfinished work and known failures: Codex sin integrar (interfaz por validar, spec 22.1); PostgreSQL no usado (ADR-014); sin sandbox de procesos (Nivel 2/3); Tailscale/TLS sin configurar; sin GitHub PR, contexto Markdown, backup programado; sin pruebas de carga/caos/WCAG automatizado. Sin fallos conocidos.
+- Tests and commands: `npm run typecheck` PASS; `npm run lint` PASS; `npx vitest run --coverage` 109/109 PASS (88,8 % ramas); `npm audit --omit=dev` 0. Flujo completo con gemma4 real en navegador PASS.
+- Decisions / invariants to preserve: docs/architecture/ADR.md (ADR-009..019). No hacer push sin pedido del usuario (el primer push se autorizo al dar la URL del repo). Ollama actualizado a 0.40.16 con autorizacion; modelos instalados: gemma4:12b, qwen3.5:9b, gemma3:12b. Nota: `ollama ps` subinforma VRAM de gemma4; usar nvidia-smi.
+- Next action: elegir entre spike de Codex (F0), sandbox en contenedor (Docker disponible), acceso privado Tailscale + TLS, PR a GitHub, o migracion a PostgreSQL.
+- Required documents: ../PROJECT_CONTEXT.md, ../ACTIVE_TASK.md, ../PROJECT_STATE.md, README.md. Spec: DevPilot_Especificacion_Ingenieria_Software_v1_0.pdf (Downloads, fuera del repo).
+- Confidence and freshness: alta, verificado 2026-11-23. PROJECT_STATE.md puede estar atrasado respecto de este archivo: verificar contra el codigo.
