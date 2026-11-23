@@ -2,6 +2,7 @@
 // Uso: npm run vendor:ui. Los resultados se versionan en apps/web/public/{vendor,fonts}.
 import { build } from "esbuild";
 import { copyFileSync, mkdirSync } from "node:fs";
+import { cwd } from "node:process";
 
 const out = "apps/web/public";
 mkdirSync(out + "/vendor", { recursive: true });
@@ -9,7 +10,7 @@ mkdirSync(out + "/fonts", { recursive: true });
 
 // Motion mini: animate sobre WAAPI (~3 KB), suficiente para toasts, diálogos y feedback de estado.
 await build({
-  stdin: { contents: 'export { animate } from "motion/mini";', resolveDir: process.cwd() },
+  stdin: { contents: 'export { animate } from "motion/mini";', resolveDir: cwd() },
   bundle: true, format: "esm", minify: true, target: "es2022",
   outfile: out + "/vendor/motion.js", legalComments: "none", banner: { js: "/* motion (MIT) https://motion.dev */" },
 });
